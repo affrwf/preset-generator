@@ -1,0 +1,93 @@
+body {
+    margin: 0;
+    padding: 0;
+    font-family: 'Segoe UI', Tahoma, sans-serif;
+    background: linear-gradient(120deg, #0b0e15, #1b2735);
+    color: #ffffff;
+  }
+  
+  .container {
+    max-width: 800px;
+    margin: 40px auto;
+    padding: 20px;
+  }
+  
+  h1 {
+    text-align: center;
+    margin-bottom: 40px;
+    color: #66fcf1;
+  }
+  
+  .card {
+    background-color: rgba(255, 255, 255, 0.07);
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 30px;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+  }
+  
+  h2 {
+    margin-top: 0;
+    color: #45a29e;
+  }
+  
+  select, button, textarea {
+    font-size: 1rem;
+  }
+  
+  select {
+    width: 100%;
+    padding: 8px;
+    margin-bottom: 16px;
+    color: #222;
+    border-radius: 4px;
+  }
+  
+  .generate-btn {
+    display: block;
+    width: 100%;
+    background-color: #45a29e;
+    color: #0b0e15;
+    padding: 10px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  
+  .generate-btn:hover {
+    background-color: #66fcf1;
+  }
+  
+  textarea {
+    width: 100%;
+    resize: vertical;
+    background-color: #0b0e15;
+    color: #66fcf1;
+    border: 2px solid #45a29e;
+    border-radius: 4px;
+    padding: 10px;
+    box-sizing: border-box;
+  }
+  
+  .button-group {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+  }
+  
+  .button-group button {
+    flex: 1;
+    padding: 10px;
+    cursor: pointer;
+    border: none;
+    border-radius: 4px;
+    color: #0b0e15;
+    background-color: #45a29e;
+    font-weight: bold;
+    transition: background-color 0.3s ease;
+  }
+  
+  .button-group button:hover {
+    background-color: #66fcf1;
+  }
+  
