@@ -1,37 +1,33 @@
-// ------ Настройки путей к вашим папкам (подкорректируйте, если нужно) ------
-const WEAPONS_PATH = './data/weapons/';  // Папка, где лежат XML-файлы оружия
-const SKINS_PATH   = './data/skins/';    // Папка, где лежат XML-файлы внешностей
+// =================== ПУТИ К ПАПКАМ (скорректируйте под вашу структуру) ===================
+const WEAPONS_PATH = './data/weapons/';
+const SKINS_PATH   = './data/skins/';
 
-// ------ К каким префиксам относится тот или иной класс ------
+// =================== Связь классов -> префиксы оружия ===================
 const classToPrefixes = {
-  'R': ['ar', 'pt', 'kn'], // Штурмовик
-  'M': ['shg', 'pt', 'kn'],// Медик
-  'E': ['smg', 'pt', 'kn'],// Инженер
-  'S': ['sr', 'pt', 'kn'], // Снайпер
+  'R': ['ar', 'mg', 'pt', 'kn'], // Штурмовик (пример, если у вас mg тоже у штурмов)
+  'M': ['shg', 'pt', 'kn'],      // Медик
+  'E': ['smg', 'pt', 'kn'],      // Инженер
+  'S': ['sr', 'pt', 'kn'],       // Снайпер
 };
 
-// ------ DOM-элементы ------
+// =================== DOM-элементы ===================
 const classSelect   = document.getElementById('classSelect');
 const generateBtn   = document.getElementById('generateBtn');
 const presetOutput  = document.getElementById('presetOutput');
 const copyBtn       = document.getElementById('copyBtn');
 const downloadBtn   = document.getElementById('downloadBtn');
 
-// ------ Глобальные массивы, в которые загрузим данные из XML ------
-let weaponConfigs = []; // Здесь будет { name, ammo, modules, prefix } для каждого оружия
-let skinConfigs   = []; // Здесь будет { name, classes } для каждого скина
+// =================== Глобальные массивы ===================
+let weaponConfigs = [];
+let skinConfigs   = [];
 
-// ============================================================================
-//  1) Функция парсинга XML (общая) — получает текст XML, отдаёт DOM объект
-// ============================================================================
+// =================== Парсер XML ===================
 function parseXMLString(xmlString) {
   const parser = new DOMParser();
   return parser.parseFromString(xmlString, "application/xml");
 }
 
-// ============================================================================
-//  2) Загрузка одного XML-файла и извлечение нужной инфы об оружии
-// ============================================================================
+// =================== Загрузка одного XML (оружие) ===================
 async function loadWeaponXML(fileName) {
   try {
     const response = await fetch(WEAPONS_PATH + fileName);
@@ -41,85 +37,81 @@ async function loadWeaponXML(fileName) {
     }
     const xmlText = await response.text();
     const xmlDoc = parseXMLString(xmlText);
-    
-    // Извлекаем name (оружия)
+
     const itemNode = xmlDoc.querySelector('item');
     if (!itemNode) return null;
+
     const weaponName = itemNode.getAttribute('name') || 'unknown_weapon';
 
-    // Извлекаем тип патрона
     const ammoParam = xmlDoc.querySelector('fireparams fire param[name="ammo_type"]');
     const ammoType = ammoParam ? ammoParam.getAttribute('value') : 'unknown_ammo';
 
     // Собираем support-модули
-    // (примерно: все <support name="xxx"/>)
     const supportNodes = xmlDoc.querySelectorAll('sockets socket support');
     const modules = [];
     supportNodes.forEach(supp => {
       const modName = supp.getAttribute('name');
-      if (modName) {
-        modules.push(modName);
-      }
+      if (modName) modules.push(modName);
     });
 
-    // Определяем префикс (ar, mg, shg, smg, sr, pt, kn и т.п.)
-    // Обычно можно смотреть по weaponName, например "ar01" => префикс "ar"
-    // Или можно в самом XML где-то искать, но предположим, что достаточно первых букв:
-    // До первой цифры выберем символы
+    // Определяем префикс по "weaponName" (например, 'ar01' => 'ar')
     const prefixMatch = weaponName.match(/^[a-z]+/i);
     const prefix = prefixMatch ? prefixMatch[0].toLowerCase() : 'other';
 
-    return {
-      name: weaponName,
-      ammoType,
-      modules,
-      prefix,
-    };
+    return { name: weaponName, ammoType, modules, prefix };
   } catch (err) {
     console.error('Ошибка загрузки оружия', err);
     return null;
   }
 }
 
-// ============================================================================
-//  3) Загрузка одного XML-файла и извлечение нужной инфы о скине (внешности)
-// ============================================================================
+// =================== Загрузка одного XML (внешность) ===================
 async function loadSkinXML(fileName) {
   try {
     const response = await fetch(SKINS_PATH + fileName);
     if (!response.ok) {
-      console.warn(`Не удалось загрузить XML внешности: ${fileName}`);
+      console.warn(`Не удалось загрузить XML скина: ${fileName}`);
       return null;
     }
     const xmlText = await response.text();
     const xmlDoc = parseXMLString(xmlText);
 
-    // Получаем <item name="..." class="..."> 
-    // (Вопрос: вы упоминали что "classes" = "R", "M" и т.п. в атрибуте?)
-    // Допустим, что атрибут называется 'classes' или 'class' — здесь придётся проверить по вашим файлам
     const itemNode = xmlDoc.querySelector('item');
     if (!itemNode) return null;
 
     const skinName = itemNode.getAttribute('name') || 'unknown_skin';
     const classesAttr = itemNode.getAttribute('classes') || itemNode.getAttribute('class') || '';
-    
-    return {
-      name: skinName,
-      classes: classesAttr,
-    };
+
+    return { name: skinName, classes: classesAttr };
   } catch (err) {
-    console.error('Ошибка загрузки внешности', err);
+    console.error('Ошибка загрузки скина', err);
     return null;
   }
 }
 
-// ============================================================================
-//  4) Функция, загружающая все XML-файлы, которые вы перечислите
-//     (упрощённо: вручную список, либо сделайте отдельный fetch по списку)
-// ============================================================================
+// =================== Пакетная (batch) загрузка массива файлов ===================
+async function loadConfigsInBatches(fileNames, loaderFn, chunkSize = 20) {
+  const results = [];
+  for (let i = 0; i < fileNames.length; i += chunkSize) {
+    // Берём порцию
+    const chunk = fileNames.slice(i, i + chunkSize);
+    // Запускаем загрузку порции
+    const chunkPromises = chunk.map(fn => loaderFn(fn));
+    const chunkResults = await Promise.all(chunkPromises);
+
+    // Собираем результаты
+    results.push(...chunkResults);
+
+    // Небольшая задержка, чтобы браузер «подышал» (минимизируем ERR_INSUFFICIENT_RESOURCES)
+    await new Promise(res => setTimeout(res, 50));
+  }
+  // Фильтруем null
+  return results.filter(Boolean);
+}
+
+// =================== Загрузка всех конфигов ===================
 async function loadAllConfigs() {
-  // Здесь можно вручную задать массив имён файлов или
-  // как-то динамически их получать. Для примера — захардкоженный список:
+  // 1) Список оружия (пример; подставьте свои файлы!)
   const weaponFiles = [
     // Пример: 'ar01.xml', 'ar02.xml', 'pt35.xml', ...
     "ak01.xml",
@@ -2982,126 +2974,93 @@ async function loadAllConfigs() {
     "spy_skin_igr_test.xml"
   ];
 
-  // Загружаем оружие
-  const weaponPromises = weaponFiles.map(fn => loadWeaponXML(fn));
-  const weaponResults = await Promise.all(weaponPromises);
-  weaponConfigs = weaponResults.filter(Boolean); // уберём null
+  // 3) Загружаем оружие пакетами
+  const loadedWeapons = await loadConfigsInBatches(weaponFiles, loadWeaponXML, 20);
+  weaponConfigs = loadedWeapons; // глобальная переменная
 
-  // Загружаем внешности
-  const skinPromises = skinFiles.map(fn => loadSkinXML(fn));
-  const skinResults = await Promise.all(skinPromises);
-  skinConfigs = skinResults.filter(Boolean);
+  // 4) Загружаем скины пакетами
+  const loadedSkins = await loadConfigsInBatches(skinFiles, loadSkinXML, 20);
+  skinConfigs = loadedSkins; // глобальная переменная
 }
 
-// ============================================================================
-//  5) Утилита: берём массив, возвращаем случайный элемент
-// ============================================================================
+// =================== Выбор случайного элемента ===================
 function getRandomElement(arr) {
   if (!arr || arr.length === 0) return null;
   const idx = Math.floor(Math.random() * arr.length);
   return arr[idx];
 }
 
-// ============================================================================
-//  6) Генерация пресета (Lua-таблица)
-// ============================================================================
+// =================== Генерация пресета ===================
 function generatePresetForClass(chosenClass) {
-  // 1) Отфильтруем оружие по нужным префиксам
-  const neededPrefixes = classToPrefixes[chosenClass]; 
-  // Пример: ['ar', 'pt', 'kn'] для R
-
-  // Для каждого префикса выберем случайное оружие, если есть
+  // Фильтруем оружие по нужным префиксам
+  const neededPrefixes = classToPrefixes[chosenClass] || [];
   const chosenWeapons = [];
 
   neededPrefixes.forEach(prefix => {
-    // Собираем все оружия с нужным prefix
-    const possibleWeapons = weaponConfigs.filter(w => w.prefix === prefix);
-    // Случайно берём одно
-    const randomWep = getRandomElement(possibleWeapons);
-    if (randomWep) {
-      chosenWeapons.push(randomWep);
-    }
+    const possible = weaponConfigs.filter(w => w.prefix === prefix);
+    const randomWep = getRandomElement(possible);
+    if (randomWep) chosenWeapons.push(randomWep);
   });
 
-  // 2) Сформируем список ammo (учитывая, что для ножа патрон не нужен)
-  const ammoEntries = [];
-  chosenWeapons.forEach(w => {
-    if (w.prefix !== 'kn') {
-      // Для всех кроме ножа
-      ammoEntries.push({
-        name: w.ammoType,
-        amount: 999
-      });
-    }
-  });
+  // Формируем ammo (нож без патрон)
+  const ammoEntries = chosenWeapons
+    .filter(w => w.prefix !== 'kn')
+    .map(w => ({ name: w.ammoType, amount: 999 }));
 
-  // 3) Собираем модули. (attachTo = имя оружия)
-  //    В шаблон — все supportы, что мы вытащили из XML
+  // Модули (attachments)
   const attachments = [];
   chosenWeapons.forEach(w => {
     w.modules.forEach(m => {
-      attachments.push({
-        name: m,
-        attachTo: w.name
-      });
+      attachments.push({ name: m, attachTo: w.name });
     });
   });
 
-  // 4) Выбираем скин для этого класса
-  //    (пропускаем те, у которых classes=="REMSH" или где не совпадает класс)
-  const possibleSkins = skinConfigs.filter(skin => {
-    // skin.classes может быть "R", "M", "E", "S" или "REMSH".
-    // Нужно взять те, что == chosenClass, и исключить REMSH
-    return (skin.classes === chosenClass) && (skin.classes !== 'REMSH');
+  // Выбираем случайную внешность (исключая REMSH, если не нужно)
+  const possibleSkins = skinConfigs.filter(s => {
+    return s.classes === chosenClass && s.classes !== 'REMSH';
   });
   const chosenSkin = getRandomElement(possibleSkins);
-  const skinName = chosenSkin ? chosenSkin.name : 'soldier_fbs_somalia2308';
+  const skinName = chosenSkin ? chosenSkin.name : 'soldier_fbs_somalia2308'; // fallback
 
-  // 5) Формируем финальную структуру
-  // Здесь можно уже собирать готовый Lua-текст.
-  // Либо сперва сформировать объект, потом строкой склеить.
-  // Для простоты — сразу склеим строку.
-
-  let lua = 'local inventory = {\n';
-  lua += '\tarmor = {\n';
-  lua += '\t\t{name = "shared_jacket_02"},\n';
-  lua += '\t\t{name = "shared_pants_02"},\n';
-  lua += '\t\t{name = "sniper_helmet_frontlines01"},\n';
-  lua += '\t\t{name = "sniper_vest_frontlines01"},\n';
-  lua += '\t\t{name = "sniper_hands_frontlines01"}, -- Перчатки\n';
-  lua += '\t\t{name = "sniper_shoes_frontlines01"}, -- Ботинки\n';
+  // Собираем Lua-таблицу
+  let lua = `local inventory = {\n`;
+  lua += `\tarmor = {\n`;
+  lua += `\t\t{name = "shared_jacket_02"},\n`;
+  lua += `\t\t{name = "shared_pants_02"},\n`;
+  lua += `\t\t{name = "sniper_helmet_frontlines01"},\n`;
+  lua += `\t\t{name = "sniper_vest_frontlines01"},\n`;
+  lua += `\t\t{name = "sniper_hands_frontlines01"}, -- Перчатки\n`;
+  lua += `\t\t{name = "sniper_shoes_frontlines01"}, -- Ботинки\n`;
   lua += `\t\t{name = "${skinName}"}, -- Скин\n`;
-  lua += '\t},\n\n';
-  
-  lua += '\titems = {\n';
+  lua += `\t},\n\n`;
+
+  lua += `\titems = {\n`;
   chosenWeapons.forEach(w => {
     lua += `\t\t{name = "${w.name}", skin = ""},\n`;
   });
-  lua += '\t},\n\n';
+  lua += `\t},\n\n`;
 
-  lua += '\tattachments = {\n';
-  attachments.forEach(att => {
-    lua += `\t\t{name = "${att.name}", attachTo = "${att.attachTo}"},\n`;
+  lua += `\tattachments = {\n`;
+  attachments.forEach(a => {
+    lua += `\t\t{name = "${a.name}", attachTo = "${a.attachTo}"},\n`;
   });
-  lua += '\t},\n\n';
+  lua += `\t},\n\n`;
 
-  lua += '\tammo = {\n';
+  lua += `\tammo = {\n`;
   ammoEntries.forEach(am => {
     lua += `\t\t{name = "${am.name}", amount = ${am.amount}},\n`;
   });
-  lua += '\t}\n';
-  lua += '}\n\nreturn inventory\n';
+  lua += `\t}\n`;
+  lua += `}\n\nreturn inventory\n`;
 
   return lua;
 }
 
-// ============================================================================
-//  7) Кнопки «Скопировать» и «Скачать»
-// ============================================================================
+// =================== Кнопки копирования и скачивания ===================
 function copyToClipboard(text) {
   navigator.clipboard.writeText(text).then(() => {
-    alert('Скопировано в буфер обмена!');
-  }, () => {
+    alert('Скопировано!');
+  }).catch(() => {
     alert('Не удалось скопировать :(');
   });
 }
@@ -3109,18 +3068,14 @@ function copyToClipboard(text) {
 function downloadPreset(text) {
   const blob = new Blob([text], { type: 'text/plain' });
   const url = URL.createObjectURL(blob);
-
   const link = document.createElement('a');
   link.href = url;
   link.download = 'warface_preset.lua';
   link.click();
-
   URL.revokeObjectURL(url);
 }
 
-// ============================================================================
-//  8) Логика нажатий
-// ============================================================================
+// =================== События ===================
 generateBtn.addEventListener('click', () => {
   const chosenClass = classSelect.value; // "R", "M", "E", "S"
   const presetLua = generatePresetForClass(chosenClass);
@@ -3135,20 +3090,15 @@ downloadBtn.addEventListener('click', () => {
   downloadPreset(presetOutput.value);
 });
 
-// ============================================================================
-//  9) При загрузке страницы - подгружаем все XML, а потом включаем кнопки
-// ============================================================================
+// =================== При загрузке страницы — грузим все configs ===================
 window.addEventListener('DOMContentLoaded', async () => {
-  // Сначала блокируем кнопку "Сгенерировать", пока не загрузили
   generateBtn.disabled = true;
   try {
     await loadAllConfigs();
     console.log('Оружие:', weaponConfigs);
     console.log('Скины:', skinConfigs);
-  } catch (e) {
-    console.error(e);
-    alert('Ошибка при загрузке конфигов');
+  } catch (err) {
+    console.error('Ошибка при загрузке конфигов:', err);
   }
-  // Разблокируем
   generateBtn.disabled = false;
 });
