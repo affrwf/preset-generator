@@ -104,7 +104,7 @@ async function loadSkinXML(fileName) {
 // ------------------------------------------------------------
 // 4) Лимитируем параллельную загрузку
 // ------------------------------------------------------------
-async function loadWithConcurrency(fileNames, loaderFn, concurrency = 15) {
+async function loadWithConcurrency(fileNames, loaderFn, concurrency = 50) {
   return new Promise((resolve) => {
     const results = new Array(fileNames.length).fill(null);
     let currentIndex = 0;
@@ -3009,11 +3009,11 @@ async function loadAllConfigs() {
   ];
 
   // 5.1) Оружие
-  const loadedWeapons = await loadWithConcurrency(weaponFiles, loadWeaponXML, 15);
+  const loadedWeapons = await loadWithConcurrency(weaponFiles, loadWeaponXML, 50);
   weaponConfigs = loadedWeapons;
 
   // 5.2) Скины
-  const loadedSkins = await loadWithConcurrency(skinFiles, loadSkinXML, 15);
+  const loadedSkins = await loadWithConcurrency(skinFiles, loadSkinXML, 50);
   skinConfigs = loadedSkins;
 }
 
