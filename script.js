@@ -3030,72 +3030,85 @@ function getRandomElement(arr) {
 // 7) Генерация Lua-пресета
 // ------------------------------------------------------------
 function generatePresetForClass(chosenClass) {
-  // 7.1) Собираем оружие
-  const neededPrefixes = classToPrefixes[chosenClass] || [];
-  const chosenWeapons = [];
-
-  neededPrefixes.forEach(prefix => {
-    const possible = weaponConfigs.filter(w => w.prefix === prefix);
-    const randomWep = getRandomElement(possible);
-    if (randomWep) {
-      chosenWeapons.push(randomWep);
+    // Фильтруем оружие по нужным префиксам
+    const neededPrefixes = classToPrefixes[chosenClass] || [];
+    const chosenWeapons = [];
+  
+    // Если это штурмовик, выбираем одно из основных оружий (ar или mg)
+    if (chosenClass === 'R') {
+      const mainWeaponPrefixes = ['ar', 'mg'];
+      const possibleMainWeapons = weaponConfigs.filter(w =>
+        mainWeaponPrefixes.includes(w.prefix)
+      );
+  
+      const selectedMainWeapon = getRandomElement(possibleMainWeapons);
+      if (selectedMainWeapon) chosenWeapons.push(selectedMainWeapon);
+  
+      // Убираем уже выбранные префиксы из списка
+      neededPrefixes.splice(neededPrefixes.indexOf('ar'), 1);
+      neededPrefixes.splice(neededPrefixes.indexOf('mg'), 1);
     }
-  });
-
-  // 7.2) Ammo (нож без патрон)
-  const ammoEntries = chosenWeapons
-    .filter(w => w.prefix !== 'kn')
-    .map(w => ({ name: w.ammoType, amount: 999 }));
-
-  // 7.3) Модули
-  const attachments = [];
-  chosenWeapons.forEach(w => {
-    w.modules.forEach(modName => {
-      attachments.push({ name: modName, attachTo: w.name });
+  
+    // Добавляем оставшееся оружие (например, пистолет и нож)
+    neededPrefixes.forEach(prefix => {
+      const possible = weaponConfigs.filter(w => w.prefix === prefix);
+      const randomWep = getRandomElement(possible);
+      if (randomWep) chosenWeapons.push(randomWep);
     });
-  });
-
-  // 7.4) Скины — исключаем REMSH, если не нужны
-  //     И берём только те, у которых s.classes совпадает с chosenClass
-  const possibleSkins = skinConfigs.filter(s => {
-    return s.classes === chosenClass && s.classes !== 'REMSH';
-  });
-  const chosenSkin = getRandomElement(possibleSkins);
-  const skinName = chosenSkin ? chosenSkin.name : 'soldier_fbs_somalia2308'; // fallback
-
-  // 7.5) Собираем Lua-текст
-  let lua = `local inventory = {\n`;
-  lua += `\tarmor = {\n`;
-  lua += `\t\t{name = "shared_jacket_02"},\n`;
-  lua += `\t\t{name = "shared_pants_02"},\n`;
-  lua += `\t\t{name = "sniper_helmet_frontlines01"},\n`;
-  lua += `\t\t{name = "sniper_vest_frontlines01"},\n`;
-  lua += `\t\t{name = "sniper_hands_frontlines01"}, -- Перчатки\n`;
-  lua += `\t\t{name = "sniper_shoes_frontlines01"}, -- Ботинки\n`;
-  lua += `\t\t{name = "${skinName}"}, -- Скин\n`;
-  lua += `\t},\n\n`;
-
-  lua += `\titems = {\n`;
-  chosenWeapons.forEach(w => {
-    lua += `\t\t{name = "${w.name}", skin = ""},\n`;
-  });
-  lua += `\t},\n\n`;
-
-  lua += `\tattachments = {\n`;
-  attachments.forEach(a => {
-    lua += `\t\t{name = "${a.name}", attachTo = "${a.attachTo}"},\n`;
-  });
-  lua += `\t},\n\n`;
-
-  lua += `\tammo = {\n`;
-  ammoEntries.forEach(am => {
-    lua += `\t\t{name = "${am.name}", amount = ${am.amount}},\n`;
-  });
-  lua += `\t}\n`;
-  lua += `}\n\nreturn inventory\n`;
-
-  return lua;
-}
+  
+    // Формируем боеприпасы (ammo), исключая нож
+    const ammoEntries = chosenWeapons
+      .filter(w => w.prefix !== 'kn')
+      .map(w => ({ name: w.ammoType, amount: 999 }));
+  
+    // Формируем модули (attachments)
+    const attachments = [];
+    chosenWeapons.forEach(w => {
+      w.modules.forEach(modName => {
+        attachments.push({ name: modName, attachTo: w.name });
+      });
+    });
+  
+    // Выбираем случайный скин для класса
+    const possibleSkins = skinConfigs.filter(s => {
+      return s.classes === chosenClass && s.classes !== 'REMSH';
+    });
+    const chosenSkin = getRandomElement(possibleSkins);
+    const skinName = chosenSkin ? chosenSkin.name : 'soldier_fbs_somalia2308';
+  
+    // Генерируем Lua-пресет
+    let lua = `local inventory = {\n`;
+    lua += `\tarmor = {\n`;
+    lua += `\t\t{name = "shared_jacket_02"},\n`;
+    lua += `\t\t{name = "shared_pants_02"},\n`;
+    lua += `\t\t{name = "sniper_helmet_frontlines01"},\n`;
+    lua += `\t\t{name = "sniper_vest_frontlines01"},\n`;
+    lua += `\t\t{name = "sniper_hands_frontlines01"}, -- Перчатки\n`;
+    lua += `\t\t{name = "sniper_shoes_frontlines01"}, -- Ботинки\n`;
+    lua += `\t\t{name = "${skinName}"}, -- Скин\n`;
+    lua += `\t},\n\n`;
+  
+    lua += `\titems = {\n`;
+    chosenWeapons.forEach(w => {
+      lua += `\t\t{name = "${w.name}", skin = ""},\n`;
+    });
+    lua += `\t},\n\n`;
+  
+    lua += `\tattachments = {\n`;
+    attachments.forEach(a => {
+      lua += `\t\t{name = "${a.name}", attachTo = "${a.attachTo}"},\n`;
+    });
+    lua += `\t},\n\n`;
+  
+    lua += `\tammo = {\n`;
+    ammoEntries.forEach(am => {
+      lua += `\t\t{name = "${am.name}", amount = ${am.amount}},\n`;
+    });
+    lua += `\t}\n`;
+    lua += `}\n\nreturn inventory\n`;
+  
+    return lua;
+  }
 
 // ------------------------------------------------------------
 // 8) Копировать / Скачать
