@@ -73,35 +73,38 @@ async function loadWeaponXML(fileName) {
 // 3) Загрузка одного XML-файла (скин)
 // ------------------------------------------------------------
 async function loadSkinXML(fileName) {
-  try {
-    const response = await fetch(SKINS_PATH + fileName);
-    if (!response.ok) {
-      console.warn(`Не удалось загрузить XML скина: ${fileName}`);
+    try {
+      const response = await fetch(SKINS_PATH + fileName);
+      if (!response.ok) {
+        console.warn(`Не удалось загрузить XML скина: ${fileName}`);
+        return null;
+      }
+  
+      const xmlText = await response.text();
+      const xmlDoc = parseXMLString(xmlText);
+  
+      // Находим главный узел GameItem
+      const gameItemNode = xmlDoc.querySelector('GameItem');
+      if (!gameItemNode) return null;
+  
+      // Имя скина из атрибута name в GameItem
+      const skinName = gameItemNode.getAttribute('name') || 'unknown_skin';
+  
+      // Находим узел <mmo_stats> и параметр classes
+      const classesParam = xmlDoc.querySelector('mmo_stats > param[name="classes"]');
+      const classesValue = classesParam ? classesParam.getAttribute('value') : '';
+  
+      return { name: skinName, classes: classesValue };
+    } catch (err) {
+      console.error('Ошибка загрузки скина', err);
       return null;
     }
-    const xmlText = await response.text();
-    const xmlDoc = parseXMLString(xmlText);
-
-    const itemNode = xmlDoc.querySelector('item');
-    if (!itemNode) return null;
-
-    const skinName = itemNode.getAttribute('name') || 'unknown_skin';
-
-    // Обычно: <item classes="R" ...> или <item class="R" ...>
-    // Проверим оба атрибута — вдруг где-то "class", а не "classes".
-    const classesAttr = itemNode.getAttribute('classes') || itemNode.getAttribute('class') || '';
-
-    return { name: skinName, classes: classesAttr };
-  } catch (err) {
-    console.error('Ошибка загрузки скина', err);
-    return null;
   }
-}
 
 // ------------------------------------------------------------
 // 4) Лимитируем параллельную загрузку
 // ------------------------------------------------------------
-async function loadWithConcurrency(fileNames, loaderFn, concurrency = 5) {
+async function loadWithConcurrency(fileNames, loaderFn, concurrency = 15) {
   return new Promise((resolve) => {
     const results = new Array(fileNames.length).fill(null);
     let currentIndex = 0;
@@ -3006,11 +3009,11 @@ async function loadAllConfigs() {
   ];
 
   // 5.1) Оружие
-  const loadedWeapons = await loadWithConcurrency(weaponFiles, loadWeaponXML, 5);
+  const loadedWeapons = await loadWithConcurrency(weaponFiles, loadWeaponXML, 15);
   weaponConfigs = loadedWeapons;
 
   // 5.2) Скины
-  const loadedSkins = await loadWithConcurrency(skinFiles, loadSkinXML, 5);
+  const loadedSkins = await loadWithConcurrency(skinFiles, loadSkinXML, 15);
   skinConfigs = loadedSkins;
 }
 
