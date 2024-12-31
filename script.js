@@ -104,7 +104,7 @@ async function loadSkinXML(fileName) {
 // ------------------------------------------------------------
 // 4) Лимитируем параллельную загрузку
 // ------------------------------------------------------------
-async function loadWithConcurrency(fileNames, loaderFn, concurrency = 1000) {
+async function loadWithConcurrency(fileNames, loaderFn, concurrency = 2000) {
   return new Promise((resolve) => {
     const results = new Array(fileNames.length).fill(null);
     let currentIndex = 0;
@@ -3009,11 +3009,11 @@ async function loadAllConfigs() {
   ];
 
   // 5.1) Оружие
-  const loadedWeapons = await loadWithConcurrency(weaponFiles, loadWeaponXML, 1000);
+  const loadedWeapons = await loadWithConcurrency(weaponFiles, loadWeaponXML, 2000);
   weaponConfigs = loadedWeapons;
 
   // 5.2) Скины
-  const loadedSkins = await loadWithConcurrency(skinFiles, loadSkinXML, 1000);
+  const loadedSkins = await loadWithConcurrency(skinFiles, loadSkinXML, 2000);
   skinConfigs = loadedSkins;
 }
 
@@ -3030,26 +3030,27 @@ function getRandomElement(arr) {
 // 7) Генерация Lua-пресета
 // ------------------------------------------------------------
 function generatePresetForClass(chosenClass) {
-    // Фильтруем оружие по нужным префиксам
     const neededPrefixes = classToPrefixes[chosenClass] || [];
     const chosenWeapons = [];
   
-    // Если это штурмовик, выбираем одно из основных оружий (ar или mg)
+    // Специальная логика для штурмовика (R): выбираем одно основное оружие (ar или mg)
     if (chosenClass === 'R') {
       const mainWeaponPrefixes = ['ar', 'mg'];
       const possibleMainWeapons = weaponConfigs.filter(w =>
         mainWeaponPrefixes.includes(w.prefix)
       );
   
+      // Выбираем только одно основное оружие (либо ar, либо mg)
       const selectedMainWeapon = getRandomElement(possibleMainWeapons);
-      if (selectedMainWeapon) chosenWeapons.push(selectedMainWeapon);
-  
-      // Убираем уже выбранные префиксы из списка
-      neededPrefixes.splice(neededPrefixes.indexOf('ar'), 1);
-      neededPrefixes.splice(neededPrefixes.indexOf('mg'), 1);
+      if (selectedMainWeapon) {
+        chosenWeapons.push(selectedMainWeapon);
+        // Удаляем использованный префикс (чтобы он не обрабатывался дальше)
+        const index = neededPrefixes.indexOf(selectedMainWeapon.prefix);
+        if (index > -1) neededPrefixes.splice(index, 1);
+      }
     }
   
-    // Добавляем оставшееся оружие (например, пистолет и нож)
+    // Обработка оставшихся префиксов (например, пистолет и нож)
     neededPrefixes.forEach(prefix => {
       const possible = weaponConfigs.filter(w => w.prefix === prefix);
       const randomWep = getRandomElement(possible);
@@ -3108,7 +3109,7 @@ function generatePresetForClass(chosenClass) {
     lua += `}\n\nreturn inventory\n`;
   
     return lua;
-  }
+  }  
 
 // ------------------------------------------------------------
 // 8) Копировать / Скачать
