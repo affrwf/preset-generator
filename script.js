@@ -1,8 +1,8 @@
-// ============ ПУТИ К ПАПКАМ (скорректируйте под ваши реалии) ============
-const WEAPONS_PATH = './data/weapons/';
-const SKINS_PATH   = './data/skins/';
+// ===================== ПУТИ К ФАЙЛАМ =====================
+const WEAPONS_PATH = './data/weapons/'; 
+const SKINS_PATH   = './data/skins/';   
 
-// ============ Связь классов -> префиксы ============
+// ===================== Связь классов -> префиксы =====================
 const classToPrefixes = {
   'R': ['ar', 'mg', 'pt', 'kn'], // Штурмовик
   'M': ['shg', 'pt', 'kn'],      // Медик
@@ -10,28 +10,28 @@ const classToPrefixes = {
   'S': ['sr', 'pt', 'kn'],       // Снайпер
 };
 
-// ============ DOM-элементы ============
+// ===================== DOM-элементы =====================
 const classSelect   = document.getElementById('classSelect');
 const generateBtn   = document.getElementById('generateBtn');
 const presetOutput  = document.getElementById('presetOutput');
 const copyBtn       = document.getElementById('copyBtn');
 const downloadBtn   = document.getElementById('downloadBtn');
 
-// ============ Глобальные массивы ============
+// ===================== Глобальные массивы =====================
 let weaponConfigs = [];
 let skinConfigs   = [];
 
-// ----------------------------------------------------------------------------
-// 1) Парсим XML-текст в DOM
-// ----------------------------------------------------------------------------
+// ------------------------------------------------------------
+// 1) Функция парсинга XML-текста в DOM
+// ------------------------------------------------------------
 function parseXMLString(xmlString) {
   const parser = new DOMParser();
   return parser.parseFromString(xmlString, "application/xml");
 }
 
-// ----------------------------------------------------------------------------
+// ------------------------------------------------------------
 // 2) Загрузка одного XML-файла (оружие)
-// ----------------------------------------------------------------------------
+// ------------------------------------------------------------
 async function loadWeaponXML(fileName) {
   try {
     const response = await fetch(WEAPONS_PATH + fileName);
@@ -58,7 +58,7 @@ async function loadWeaponXML(fileName) {
       if (modName) modules.push(modName);
     });
 
-    // Определяем префикс (ar, mg, shg, sr, smg, pt, kn, ...)
+    // Префикс (ar, mg, shg, sr, smg, pt, kn...)
     const prefixMatch = weaponName.match(/^[a-z]+/i);
     const prefix = prefixMatch ? prefixMatch[0].toLowerCase() : 'other';
 
@@ -69,9 +69,9 @@ async function loadWeaponXML(fileName) {
   }
 }
 
-// ----------------------------------------------------------------------------
-// 3) Загрузка одного XML-файла (скин / внешность)
-// ----------------------------------------------------------------------------
+// ------------------------------------------------------------
+// 3) Загрузка одного XML-файла (скин)
+// ------------------------------------------------------------
 async function loadSkinXML(fileName) {
   try {
     const response = await fetch(SKINS_PATH + fileName);
@@ -86,7 +86,9 @@ async function loadSkinXML(fileName) {
     if (!itemNode) return null;
 
     const skinName = itemNode.getAttribute('name') || 'unknown_skin';
-    // Или: <item classes="R" ...> / <item classes="M" ...> и т.д.
+
+    // Обычно: <item classes="R" ...> или <item class="R" ...>
+    // Проверим оба атрибута — вдруг где-то "class", а не "classes".
     const classesAttr = itemNode.getAttribute('classes') || itemNode.getAttribute('class') || '';
 
     return { name: skinName, classes: classesAttr };
@@ -96,27 +98,23 @@ async function loadSkinXML(fileName) {
   }
 }
 
-// ----------------------------------------------------------------------------
-// 4) Лимитируем параллелизм (Concurrency)
-//    Запускаем не более "concurrency" запросов одновременно
-// ----------------------------------------------------------------------------
+// ------------------------------------------------------------
+// 4) Лимитируем параллельную загрузку
+// ------------------------------------------------------------
 async function loadWithConcurrency(fileNames, loaderFn, concurrency = 5) {
   return new Promise((resolve) => {
     const results = new Array(fileNames.length).fill(null);
-    let currentIndex = 0;     // Какой файл брать следующим
-    let activeCount  = 0;     // Сколько запросов в процессе
-    let completed    = 0;     // Сколько завершили
+    let currentIndex = 0;
+    let activeCount  = 0;
+    let completed    = 0;
 
     function next() {
-      // Проверяем, не закончили ли мы все
       if (completed >= fileNames.length) {
-        // Возвращаем то, что смогли загрузить (убираем null)
         const filtered = results.filter(Boolean);
         resolve(filtered);
         return;
       }
 
-      // Пока есть свободные "слоты" и ещё есть файлы
       while (activeCount < concurrency && currentIndex < fileNames.length) {
         const index = currentIndex;
         const fileName = fileNames[index];
@@ -125,31 +123,26 @@ async function loadWithConcurrency(fileNames, loaderFn, concurrency = 5) {
         activeCount++;
 
         loaderFn(fileName)
-          .then(res => {
-            results[index] = res;
-          })
+          .then(res => { results[index] = res; })
           .catch(err => {
             console.warn("Ошибка при загрузке:", fileName, err);
           })
           .finally(() => {
             activeCount--;
             completed++;
-            // Небольшая пауза (50 мс), чтобы не забивать браузер
             setTimeout(next, 50);
           });
       }
     }
-
-    // Стартуем
     next();
   });
 }
 
-// ----------------------------------------------------------------------------
-// 5) Грузим все файлы (оружие и скины) с ограничением параллельности
-// ----------------------------------------------------------------------------
+// ------------------------------------------------------------
+// 5) Грузим все конфиги (оружие + скины)
+// ------------------------------------------------------------
 async function loadAllConfigs() {
-  // 5.1) Укажите свои списки файлов:
+  // Подставьте РЕАЛЬНЫЕ ИМЕНА своих файлов!
   const weaponFiles = [
     // Пример: 'ar01.xml', 'ar02.xml', 'pt35.xml', ...
     "ak01.xml",
@@ -3012,27 +3005,29 @@ async function loadAllConfigs() {
     "spy_skin_igr_test.xml"
   ];
 
-  // 5.2) Загружаем с лимитом concurrency=5 (меняйте по вкусу)
+  // 5.1) Оружие
   const loadedWeapons = await loadWithConcurrency(weaponFiles, loadWeaponXML, 5);
-  weaponConfigs = loadedWeapons; // Глобальная переменная
+  weaponConfigs = loadedWeapons;
 
+  // 5.2) Скины
   const loadedSkins = await loadWithConcurrency(skinFiles, loadSkinXML, 5);
-  skinConfigs = loadedSkins; // Глобальная переменная
+  skinConfigs = loadedSkins;
 }
 
-// ----------------------------------------------------------------------------
-// 6) Выбор случайного элемента из массива
-// ----------------------------------------------------------------------------
+// ------------------------------------------------------------
+// 6) Выбор случайного элемента
+// ------------------------------------------------------------
 function getRandomElement(arr) {
   if (!arr || arr.length === 0) return null;
   const idx = Math.floor(Math.random() * arr.length);
   return arr[idx];
 }
 
-// ----------------------------------------------------------------------------
-// 7) Генерация Lua-пресета для выбранного класса
-// ----------------------------------------------------------------------------
+// ------------------------------------------------------------
+// 7) Генерация Lua-пресета
+// ------------------------------------------------------------
 function generatePresetForClass(chosenClass) {
+  // 7.1) Собираем оружие
   const neededPrefixes = classToPrefixes[chosenClass] || [];
   const chosenWeapons = [];
 
@@ -3044,27 +3039,28 @@ function generatePresetForClass(chosenClass) {
     }
   });
 
-  // Формируем ammo (нож без патрон)
+  // 7.2) Ammo (нож без патрон)
   const ammoEntries = chosenWeapons
     .filter(w => w.prefix !== 'kn')
     .map(w => ({ name: w.ammoType, amount: 999 }));
 
-  // Модули
+  // 7.3) Модули
   const attachments = [];
   chosenWeapons.forEach(w => {
-    w.modules.forEach(m => {
-      attachments.push({ name: m, attachTo: w.name });
+    w.modules.forEach(modName => {
+      attachments.push({ name: modName, attachTo: w.name });
     });
   });
 
-  // Скин (исключаем REMSH, если не нужно)
+  // 7.4) Скины — исключаем REMSH, если не нужны
+  //     И берём только те, у которых s.classes совпадает с chosenClass
   const possibleSkins = skinConfigs.filter(s => {
     return s.classes === chosenClass && s.classes !== 'REMSH';
   });
   const chosenSkin = getRandomElement(possibleSkins);
-  const skinName = chosenSkin ? chosenSkin.name : 'soldier_fbs_somalia2308';
+  const skinName = chosenSkin ? chosenSkin.name : 'soldier_fbs_somalia2308'; // fallback
 
-  // Склеиваем Lua-текст
+  // 7.5) Собираем Lua-текст
   let lua = `local inventory = {\n`;
   lua += `\tarmor = {\n`;
   lua += `\t\t{name = "shared_jacket_02"},\n`;
@@ -3098,9 +3094,9 @@ function generatePresetForClass(chosenClass) {
   return lua;
 }
 
-// ----------------------------------------------------------------------------
-// 8) Кнопки: «Скопировать» и «Скачать»
-// ----------------------------------------------------------------------------
+// ------------------------------------------------------------
+// 8) Копировать / Скачать
+// ------------------------------------------------------------
 function copyToClipboard(text) {
   navigator.clipboard.writeText(text).then(() => {
     alert('Скопировано!');
@@ -3119,9 +3115,9 @@ function downloadPreset(text) {
   URL.revokeObjectURL(url);
 }
 
-// ----------------------------------------------------------------------------
-// 9) Привязываем события
-// ----------------------------------------------------------------------------
+// ------------------------------------------------------------
+// 9) События кнопок
+// ------------------------------------------------------------
 generateBtn.addEventListener('click', () => {
   const chosenClass = classSelect.value;
   const presetLua = generatePresetForClass(chosenClass);
@@ -3136,9 +3132,9 @@ downloadBtn.addEventListener('click', () => {
   downloadPreset(presetOutput.value);
 });
 
-// ----------------------------------------------------------------------------
-// 10) При загрузке страницы: подгружаем файлы (с лимитом параллельности)
-// ----------------------------------------------------------------------------
+// ------------------------------------------------------------
+// 10) При загрузке страницы: грузим все файлы
+// ------------------------------------------------------------
 window.addEventListener('DOMContentLoaded', async () => {
   generateBtn.disabled = true;
   try {
